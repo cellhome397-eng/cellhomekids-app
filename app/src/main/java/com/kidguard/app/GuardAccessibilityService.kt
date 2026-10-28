@@ -40,7 +40,7 @@ class GuardAccessibilityService : AccessibilityService() {
         override fun run() {
             if (::prefs.isInitialized && prefs.screenLocked()) {
                 val cp = currentPkg
-                if (cp != packageName && (cp == null || cp !in Apps.LOCK_ALLOWED)) {
+                if (cp != packageName && (cp == null || cp !in lockAllowed())) {
                     LockActivity.show(this@GuardAccessibilityService)
                 }
                 handler.postDelayed(this, 1200)
@@ -60,7 +60,7 @@ class GuardAccessibilityService : AccessibilityService() {
             // Never re-launch while our own lock screen is already in front, or the PIN dialog
             // the parent is typing into would be cleared.
             val cp = currentPkg
-            if (prefs.screenLocked() && cp != packageName && (cp == null || cp !in Apps.LOCK_ALLOWED)) {
+            if (prefs.screenLocked() && cp != packageName && (cp == null || cp !in lockAllowed())) {
                 LockActivity.show(ctx)
             }
             currentPkg?.let { evaluate(it) }
@@ -119,11 +119,15 @@ class GuardAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    /** What the kid can still open while locked: calls + contacts, or nothing (full lock). */
+    private fun lockAllowed(): Set<String> =
+        if (prefs.lockCallsAllowed) Apps.LOCK_ALLOWED else emptySet()
+
     private fun evaluate(pkg: String) {
         if (!prefs.setupComplete) return
         // Parent hold-lock wins over everything except calls and our own lock screen.
         if (prefs.screenLocked()) {
-            if (pkg !in Apps.LOCK_ALLOWED && pkg != packageName) LockActivity.show(this)
+            if (pkg !in lockAllowed() && pkg != packageName) LockActivity.show(this)
             return
         }
         val now = System.currentTimeMillis()

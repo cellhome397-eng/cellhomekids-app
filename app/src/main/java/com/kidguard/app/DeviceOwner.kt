@@ -129,7 +129,11 @@ object Commands {
         // Persistent "hold lock": stays locked until the parent unlocks (or the PIN is entered).
         val wasLocked = prefs.screenLocked()
         val holdLockAt = (data["holdLockAt"] as? Number)?.toLong() ?: 0L
-        if (holdLockAt > prefs.lockOnAt) prefs.lockOnAt = holdLockAt
+        if (holdLockAt > prefs.lockOnAt) {
+            prefs.lockOnAt = holdLockAt
+            // Lock mode chosen by the parent for this lock: allow calls, or full lock.
+            prefs.lockCallsAllowed = (data["lockCalls"] as? Boolean) ?: true
+        }
         val holdUnlockAt = (data["holdUnlockAt"] as? Number)?.toLong() ?: 0L
         if (holdUnlockAt > prefs.lockOffAt) prefs.lockOffAt = holdUnlockAt
         val nowLocked = prefs.screenLocked()

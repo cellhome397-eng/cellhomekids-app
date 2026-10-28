@@ -84,6 +84,11 @@ class Prefs(context: Context) {
     /** True while the phone is held locked by the parent. */
     fun screenLocked(): Boolean = setupComplete && lockOnAt > lockOffAt
 
+    /** When locked, whether the kid can still open Phone + Contacts to call. Default yes. */
+    var lockCallsAllowed: Boolean
+        get() = sp.getBoolean("lockCallsAllowed", true)
+        set(v) { sp.edit().putBoolean("lockCallsAllowed", v).apply() }
+
     var lastLocationAt: Long
         get() = sp.getLong("lastLocationAt", 0L)
         set(v) { sp.edit().putLong("lastLocationAt", v).apply() }
