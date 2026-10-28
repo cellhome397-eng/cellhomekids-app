@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cell Home brand: red / black -->
+    <color name="brand">#E31B23</color>
+    <color name="brand_dark">#111111</color>
+    <color name="ok">#15803D</color>
+    <color name="warn">#E31B23</color>
+    <color name="muted">#6B6B73</color>
+    <color name="block_bg">#111111</color>
+    <color name="white">#FFFFFF</color>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cell Home Kids</string>
+    <string name="accessibility_label">Cell Home Kids app blocking</string>
+    <string name="accessibility_description">Lets Cell Home Kids block apps your parent has limited, enforce bedtime and daily screen time limits. It only looks at which app is open, never at what is on the screen.</string>
+    <string name="admin_disable_warning">Turning this off lets Cell Home Kids be uninstalled. Your parent will be notified.</string>
+</resources>
