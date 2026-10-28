@@ -14,16 +14,23 @@ object Enforcer {
         pausedUntil: Long,
         now: Long = System.currentTimeMillis(),
         settingsUnlockUntil: Long = 0L,
+        launchers: Set<String> = emptySet(),
     ): BlockReason? {
-        if (pkg in allowed) return null
+        // Never block the things the phone needs to work: calls, the home screen, our own app.
+        if (pkg == "com.kidguard.app") return null
+        if (pkg in Apps.CALL_PACKAGES) return null
+        if (pkg in launchers) return null
         if (pausedUntil > now) return null
         if (pkg in Apps.SETTINGS_PACKAGES) {
             if (!rules.lockSettings) return null
             if (settingsUnlockUntil > now) return null
             return BlockReason.SETTINGS_LOCKED
         }
-        if (isBedtime(rules.bedtime, now)) return BlockReason.BEDTIME
+        // A blocked app is blocked even if it would otherwise be "allowed" (e.g. Google search,
+        // assistant), so a shortcut can't sneak it past the block.
         if (pkg in rules.blockedApps) return BlockReason.BLOCKED_APP
+        if (pkg in allowed) return null
+        if (isBedtime(rules.bedtime, now)) return BlockReason.BEDTIME
         rules.appLimits[pkg]?.let { limit ->
             if ((usageMs[pkg] ?: 0L) >= limit * 60_000L) return BlockReason.APP_LIMIT
         }

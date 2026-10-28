@@ -33,7 +33,7 @@ object LocationTracker {
             val client = LocationServices.getFusedLocationProviderClient(ctx)
             val cts = CancellationTokenSource()
             val loc = Tasks.await(
-                client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token),
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token),
                 20, TimeUnit.SECONDS,
             ) ?: Tasks.await(client.lastLocation, 5, TimeUnit.SECONDS) ?: return
             process(ctx, loc)
@@ -49,7 +49,7 @@ object LocationTracker {
         if (!prefs.setupComplete || prefs.parentUid == null || !hasPermission(ctx)) return
         try {
             val client = LocationServices.getFusedLocationProviderClient(ctx)
-            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token)
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
                 .addOnSuccessListener { loc ->
                     if (loc != null) {
                         process(ctx, loc)

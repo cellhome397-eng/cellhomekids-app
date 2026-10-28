@@ -30,7 +30,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:gravity="center"
-        android:text="Your parent locked this phone. It will unlock when your parent unlocks it. You can still make calls."
+        android:text="Your parent locked this phone. It will unlock when your parent unlocks it. You can still call and open Contacts."
         android:textColor="#C9C9CF"
         android:textSize="16sp" />
 

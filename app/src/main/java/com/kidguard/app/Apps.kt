@@ -14,7 +14,7 @@ object Apps {
         "com.google.android.packageinstaller",
     )
 
-    /** Dialer / in-call / emergency: allowed to show even while the phone is held locked. */
+    /** Dialer / in-call / emergency: always allowed (calls are never blocked). */
     val CALL_PACKAGES = setOf(
         "com.android.phone",
         "com.android.server.telecom",
@@ -25,6 +25,17 @@ object Apps {
         "com.android.incallui",
         "com.samsung.android.incallui",
     )
+
+    /** Contacts apps, so a locked phone can still look up and call family. */
+    val CONTACTS_PACKAGES = setOf(
+        "com.android.contacts",
+        "com.google.android.contacts",
+        "com.samsung.android.app.contacts",
+        "com.samsung.android.contacts",
+    )
+
+    /** What stays usable while the parent has the phone held locked: calls + contacts. */
+    val LOCK_ALLOWED = CALL_PACKAGES + CONTACTS_PACKAGES
 
     /** Never blocked: phone calls, emergency, system UI. */
     private val SYSTEM_ALLOWED = setOf(

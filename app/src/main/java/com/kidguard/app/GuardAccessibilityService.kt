@@ -9,7 +9,8 @@ import java.util.concurrent.Executors
 
 /**
  * Watches which app is in front and sends the kid back home when the rules say no.
- * It only reads the package name of the foreground app, never screen content.
+ * It reads the foreground package name; on Settings screens it also checks whether the
+ * screen is about Cell Home Kids (to stop the kid uninstalling or disabling it).
  */
 class GuardAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
@@ -19,6 +20,7 @@ class GuardAccessibilityService : AccessibilityService() {
     private var currentPkg: String? = null
     private var allowed: Set<String> = emptySet()
     private var imes: Set<String> = emptySet()
+    private var homes: Set<String> = emptySet()
     private var allowedAt = 0L
 
     private var usage: Map<String, Long> = emptyMap()
@@ -30,6 +32,24 @@ class GuardAccessibilityService : AccessibilityService() {
     private var lastSyncKick = 0L
     private var lastLocationKick = 0L
 
+    // Lowercased words that mark a Settings screen as being about this app.
+    private var selfTargets: List<String> = emptyList()
+
+    /** While the parent lock is on, re-assert it fast so no app stays in front. */
+    private val lockWatch = object : Runnable {
+        override fun run() {
+            if (::prefs.isInitialized && prefs.screenLocked()) {
+                val cp = currentPkg
+                if (cp != packageName && (cp == null || cp !in Apps.LOCK_ALLOWED)) {
+                    LockActivity.show(this@GuardAccessibilityService)
+                }
+                handler.postDelayed(this, 1200)
+            } else {
+                handler.postDelayed(this, 4000)
+            }
+        }
+    }
+
     /** Re-checks every 30 s so limits and bedtime kick in while an app is already open. */
     private val tick = object : Runnable {
         override fun run() {
@@ -40,7 +60,7 @@ class GuardAccessibilityService : AccessibilityService() {
             // Never re-launch while our own lock screen is already in front, or the PIN dialog
             // the parent is typing into would be cleared.
             val cp = currentPkg
-            if (prefs.screenLocked() && cp != packageName && (cp == null || cp !in Apps.CALL_PACKAGES)) {
+            if (prefs.screenLocked() && cp != packageName && (cp == null || cp !in Apps.LOCK_ALLOWED)) {
                 LockActivity.show(ctx)
             }
             currentPkg?.let { evaluate(it) }
@@ -62,17 +82,32 @@ class GuardAccessibilityService : AccessibilityService() {
         prefs = Prefs(this)
         RulesStore.load(this)
         refreshAllowed()
+        selfTargets = listOf(
+            getString(R.string.app_name).lowercase(),
+            getString(R.string.accessibility_label).lowercase(),
+            packageName.lowercase(),
+        )
         handler.post(tick)
+        handler.post(lockWatch)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (!::prefs.isInitialized) return
+        if (event == null || !::prefs.isInitialized) return
+        val type = event.eventType
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         // Notification shade and keyboards pop over the current app; ignore them.
         if (pkg == "com.android.systemui" || pkg in imes) return
-        currentPkg = pkg
-        evaluate(pkg)
+
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            currentPkg = pkg
+            evaluate(pkg)
+            return
+        }
+        // Content changed: cheap early-outs so we don't scan on every little UI change.
+        if (prefs.screenLocked()) { evaluate(pkg); return }
+        if (pkg in Apps.SETTINGS_PACKAGES && prefs.setupComplete) guardSettingsScreen(pkg)
     }
 
     override fun onInterrupt() {}
@@ -88,21 +123,73 @@ class GuardAccessibilityService : AccessibilityService() {
         if (!prefs.setupComplete) return
         // Parent hold-lock wins over everything except calls and our own lock screen.
         if (prefs.screenLocked()) {
-            if (pkg !in Apps.CALL_PACKAGES && pkg != packageName) LockActivity.show(this)
+            if (pkg !in Apps.LOCK_ALLOWED && pkg != packageName) LockActivity.show(this)
             return
         }
         val now = System.currentTimeMillis()
         if (now - allowedAt > ALLOWED_REFRESH_MS) refreshAllowed()
         val rules = RulesStore.rules
         val pausedUntil = maxOf(rules.pausedUntil, prefs.localPauseUntil)
-        val reason = Enforcer.check(pkg, rules, allowed, usage, pausedUntil, now, prefs.settingsUnlockUntil)
-        if (reason != null) block(pkg, reason)
+        val reason = Enforcer.check(pkg, rules, allowed, usage, pausedUntil, now, prefs.settingsUnlockUntil, homes)
+        if (reason != null) {
+            block(pkg, reason)
+        } else if (pkg in Apps.SETTINGS_PACKAGES) {
+            // Settings is allowed (e.g. for Wi-Fi), but never let the kid reach a screen
+            // that could uninstall Cell Home or turn off its permissions.
+            guardSettingsScreen(pkg)
+        }
         if (now - usageAt > USAGE_REFRESH_MS) refreshUsageAsync()
+    }
+
+    /**
+     * Self-protection: while the kid is inside Settings / the uninstaller, if the screen is
+     * about Cell Home Kids (its App info, uninstall, accessibility or device-admin screen),
+     * send them back. Normal screens (Wi-Fi, Bluetooth, hotspot…) are left alone.
+     */
+    private fun guardSettingsScreen(pkg: String) {
+        if (!windowMentionsSelf()) return
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        handler.postDelayed({
+            if (currentPkg in Apps.SETTINGS_PACKAGES && windowMentionsSelf()) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+        }, 350)
+        Alerts.send(
+            this, "settings_attempt", "Tried to change Cell Home Kids",
+            "${prefs.deviceName} opened a Settings screen for Cell Home Kids (uninstall or permissions). It was blocked.",
+            "self-protect",
+        )
+    }
+
+    /** True if the current screen's text mentions this app, its service, or its package. */
+    private fun windowMentionsSelf(): Boolean {
+        val root = try { rootInActiveWindow } catch (e: Exception) { null } ?: return false
+        return try {
+            nodeContains(root, selfTargets, 0)
+        } catch (e: Exception) {
+            false
+        } finally {
+            try { root.recycle() } catch (e: Exception) {}
+        }
+    }
+
+    private fun nodeContains(node: android.view.accessibility.AccessibilityNodeInfo?, targets: List<String>, depth: Int): Boolean {
+        if (node == null || depth > 40) return false
+        val t = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")).lowercase()
+        if (t.isNotBlank() && targets.any { it.isNotEmpty() && t.contains(it) }) return true
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val hit = nodeContains(child, targets, depth + 1)
+            try { child.recycle() } catch (e: Exception) {}
+            if (hit) return true
+        }
+        return false
     }
 
     private fun refreshAllowed() {
         allowed = Apps.alwaysAllowed(this)
         imes = Apps.imePackages(this)
+        homes = Apps.homePackages(this)
         allowedAt = System.currentTimeMillis()
     }
 
