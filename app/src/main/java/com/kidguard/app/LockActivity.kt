@@ -27,10 +27,44 @@ class LockActivity : AppCompatActivity() {
         setContentView(R.layout.activity_lock)
 
         findViewById<Button>(R.id.parentUnlock).setOnClickListener { askPin() }
+
+        // When the parent allowed calls, show Call + Contacts so the child can reach family.
+        val callRow = findViewById<android.view.View>(R.id.callRow)
+        if (Prefs(this).lockCallsAllowed) {
+            callRow.visibility = android.view.View.VISIBLE
+            findViewById<Button>(R.id.callBtn).setOnClickListener { openDialer() }
+            findViewById<Button>(R.id.contactsBtn).setOnClickListener { openContacts() }
+        } else {
+            callRow.visibility = android.view.View.GONE
+        }
+
         // Back does nothing: the kid can't leave the lock.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {}
         })
+    }
+
+    private fun openDialer() {
+        try {
+            startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) { /* no dialer */ }
+    }
+
+    private fun openContacts() {
+        try {
+            startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_APP_CONTACTS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            try {
+                startActivity(
+                    Intent(Intent.ACTION_VIEW, android.provider.ContactsContract.Contacts.CONTENT_URI)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e2: Exception) { /* no contacts app */ }
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())

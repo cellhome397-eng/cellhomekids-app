@@ -45,7 +45,36 @@
         android:textStyle="bold"
         android:letterSpacing="0.08" />
 
-    <!-- Hidden parent unlock: long-press the lock icon to enter the PIN. -->
+    <!-- Shown only when the parent allowed calls: let the child reach Phone + Contacts. -->
+    <LinearLayout
+        android:id="@+id/callRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="34dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/callBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:backgroundTint="#E31B23"
+            android:paddingStart="26dp"
+            android:paddingEnd="26dp"
+            android:text="📞 Call"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/contactsBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#333333"
+            android:text="👤 Contacts"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- Hidden parent unlock: enter the PIN. -->
     <Button
         android:id="@+id/parentUnlock"
         android:layout_width="wrap_content"
