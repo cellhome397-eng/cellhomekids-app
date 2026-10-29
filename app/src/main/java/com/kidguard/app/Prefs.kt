@@ -106,6 +106,10 @@ class Prefs(context: Context) {
         get() = sp.getLong("settingsUnlockHandledAt", 0L)
         set(v) { sp.edit().putLong("settingsUnlockHandledAt", v).apply() }
 
+    var pinHandledAt: Long
+        get() = sp.getLong("pinHandledAt", 0L)
+        set(v) { sp.edit().putLong("pinHandledAt", v).apply() }
+
     /** Which watched places the kid is currently inside (geofence state). */
     var geofenceInside: Set<String>
         get() = sp.getStringSet("geofenceInside", emptySet())?.toSet() ?: emptySet()
@@ -128,6 +132,8 @@ class Prefs(context: Context) {
 
     fun hasPin(): Boolean = sp.contains("pinHash")
     fun setPin(pin: String) { sp.edit().putString("pinHash", hash(pin)).apply() }
+    /** Set the PIN from a ready-made SHA-256 hash (parent/owner reset it from the dashboard). */
+    fun setPinHash(h: String) { sp.edit().putString("pinHash", h.lowercase()).apply() }
     fun checkPin(pin: String): Boolean = sp.getString("pinHash", null) == hash(pin)
 
     /** Returns true only the first time [key] is seen today (used to avoid alert spam). */

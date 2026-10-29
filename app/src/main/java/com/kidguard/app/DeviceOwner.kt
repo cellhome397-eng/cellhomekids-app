@@ -165,6 +165,13 @@ object Commands {
             }
         }
 
+        // Reset the parent PIN remotely (parent from their dashboard, or the owner).
+        val pinAt = (data["setPinAt"] as? Number)?.toLong() ?: 0L
+        if (pinAt > prefs.pinHandledAt) {
+            prefs.pinHandledAt = pinAt
+            (data["pinHash"] as? String)?.let { if (it.length == 64) prefs.setPinHash(it) }
+        }
+
         val releaseAt = (data["releaseAt"] as? Number)?.toLong() ?: 0L
         if (releaseAt > prefs.releaseHandledAt) {
             prefs.releaseHandledAt = releaseAt
