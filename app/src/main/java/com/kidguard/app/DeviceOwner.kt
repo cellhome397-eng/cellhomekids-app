@@ -36,6 +36,11 @@ object DeviceOwner {
     fun enforce(ctx: Context, rules: Rules, blockingServiceOn: Boolean, usageMs: Map<String, Long>? = null) {
         if (!isOwner(ctx)) return
         val prefs = Prefs(ctx)
+        // Switched off by Cell Home: don't suspend any apps.
+        if (prefs.serviceDisabled) {
+            try { syncSuspended(ctx, emptySet()) } catch (e: Exception) {}
+            return
+        }
         try {
             dpm(ctx).setUninstallBlocked(admin(ctx), ctx.packageName, true)
             if (!prefs.setupComplete) {

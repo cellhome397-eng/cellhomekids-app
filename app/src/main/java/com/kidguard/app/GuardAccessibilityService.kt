@@ -125,6 +125,8 @@ class GuardAccessibilityService : AccessibilityService() {
 
     private fun evaluate(pkg: String) {
         if (!prefs.setupComplete) return
+        // Switched off by Cell Home: the app controls nothing until it's enabled again.
+        if (prefs.serviceDisabled) return
         // Parent hold-lock wins over everything except calls and our own lock screen.
         if (prefs.screenLocked()) {
             if (pkg !in lockAllowed() && pkg != packageName) LockActivity.show(this)

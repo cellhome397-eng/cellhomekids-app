@@ -32,10 +32,11 @@ object LocationTracker {
         try {
             val client = LocationServices.getFusedLocationProviderClient(ctx)
             val cts = CancellationTokenSource()
-            val loc = Tasks.await(
+            val fresh = Tasks.await(
                 client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token),
                 20, TimeUnit.SECONDS,
-            ) ?: Tasks.await(client.lastLocation, 5, TimeUnit.SECONDS) ?: return
+            )
+            val loc = fresh ?: Tasks.await(client.lastLocation, 5, TimeUnit.SECONDS)?.takeIf { isUsable(it) } ?: return
             process(ctx, loc)
             prefs.lastLocationAt = System.currentTimeMillis()
         } catch (e: Exception) {
@@ -55,9 +56,10 @@ object LocationTracker {
                         process(ctx, loc)
                         prefs.lastLocationAt = System.currentTimeMillis()
                     } else {
-                        // No fresh fix (common in the background): use the last known position.
+                        // No fresh fix: use the last known position only if it's recent and
+                        // reasonably accurate, so we don't report a stale / far-off location.
                         client.lastLocation.addOnSuccessListener { last ->
-                            if (last != null) {
+                            if (last != null && isUsable(last)) {
                                 process(ctx, last)
                                 prefs.lastLocationAt = System.currentTimeMillis()
                             }
@@ -67,6 +69,12 @@ object LocationTracker {
         } catch (e: SecurityException) {
             Log.w("KidGuard", "Location permission missing", e)
         }
+    }
+
+    /** A last-known fix is usable only if it's fresh (≤3 min) and accurate (≤120 m). */
+    private fun isUsable(loc: Location): Boolean {
+        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+        return ageMs <= 3 * 60_000L && loc.hasAccuracy() && loc.accuracy <= 120f
     }
 
     private fun process(ctx: Context, loc: Location) {

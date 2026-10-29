@@ -51,6 +51,11 @@ class Prefs(context: Context) {
         get() = sp.getLong("settingsUnlockUntil", 0L)
         set(v) { sp.edit().putLong("settingsUnlockUntil", v).apply() }
 
+    /** The Cell Home owner disabled this family's service: the app stops controlling the phone. */
+    var serviceDisabled: Boolean
+        get() = sp.getBoolean("serviceDisabled", false)
+        set(v) { sp.edit().putBoolean("serviceDisabled", v).apply() }
+
     var protectionAlerted: Boolean
         get() = sp.getBoolean("protectionAlerted", false)
         set(v) { sp.edit().putBoolean("protectionAlerted", v).apply() }
