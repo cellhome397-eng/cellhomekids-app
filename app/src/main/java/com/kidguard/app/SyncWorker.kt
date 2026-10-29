@@ -55,10 +55,12 @@ object Sync {
         val uid = prefs.parentUid ?: return
         if (FirebaseAuth.getInstance().currentUser?.uid != prefs.authUid) return
 
-        // Is this family switched off by the Cell Home owner?
+        // Is this family switched off, or not yet activated, by the Cell Home owner?
         try {
             val fam = Tasks.await(Fire.db.collection("parents").document(uid).get(), 15, TimeUnit.SECONDS)
-            prefs.serviceDisabled = fam.exists() && fam.getBoolean("disabled") == true
+            val disabled = fam.exists() && fam.getBoolean("disabled") == true
+            val pending = fam.exists() && fam.getBoolean("approved") == false
+            prefs.serviceDisabled = disabled || pending
         } catch (e: Exception) {
             // keep the last known state if we can't reach it
         }
