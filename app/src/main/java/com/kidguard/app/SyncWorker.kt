@@ -60,7 +60,9 @@ object Sync {
             val fam = Tasks.await(Fire.db.collection("parents").document(uid).get(), 15, TimeUnit.SECONDS)
             val disabled = fam.exists() && fam.getBoolean("disabled") == true
             val pending = fam.exists() && fam.getBoolean("approved") == false
-            prefs.serviceDisabled = disabled || pending
+            val expiresAt = if (fam.exists()) (fam.get("expiresAt") as? Number)?.toLong() ?: 0L else 0L
+            val expired = expiresAt > 0L && System.currentTimeMillis() > expiresAt
+            prefs.serviceDisabled = disabled || pending || expired
         } catch (e: Exception) {
             // keep the last known state if we can't reach it
         }
