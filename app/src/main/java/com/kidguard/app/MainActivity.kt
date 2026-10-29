@@ -247,6 +247,18 @@ class MainActivity : AppCompatActivity() {
             requestLocation()
             openSettings(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
         }
+        val smsOk = Status.smsPermission(this)
+        addStep(
+            "6. SMS control (optional)",
+            "Lets you lock or locate this phone by text message even when it has no internet.",
+            smsOk, "Allow",
+        ) {
+            try {
+                androidx.core.app.ActivityCompat.requestPermissions(
+                    this, arrayOf(android.Manifest.permission.RECEIVE_SMS), 43
+                )
+            } catch (e: Exception) {}
+        }
         addStep(
             "Full control (optional)",
             if (DeviceOwner.isOwner(this)) {

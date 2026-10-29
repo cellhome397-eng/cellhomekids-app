@@ -45,4 +45,7 @@ object Status {
         val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
         return pm.isIgnoringBatteryOptimizations(ctx.packageName)
     }
+
+    fun smsPermission(ctx: Context): Boolean =
+        ctx.checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
 }

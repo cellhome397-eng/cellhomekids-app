@@ -116,6 +116,16 @@ class Prefs(context: Context) {
         get() = sp.getStringSet("suspended", emptySet())?.toSet() ?: emptySet()
         set(v) { sp.edit().putStringSet("suspended", v).apply() }
 
+    /** Short code the parent puts in an SMS command. Lets them lock/locate with no internet. */
+    val smsCode: String
+        get() {
+            sp.getString("smsCode", null)?.let { return it }
+            val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+            val code = (1..4).map { chars.random() }.joinToString("")
+            sp.edit().putString("smsCode", code).apply()
+            return code
+        }
+
     fun hasPin(): Boolean = sp.contains("pinHash")
     fun setPin(pin: String) { sp.edit().putString("pinHash", hash(pin)).apply() }
     fun checkPin(pin: String): Boolean = sp.getString("pinHash", null) == hash(pin)

@@ -103,6 +103,8 @@ object Sync {
                 "model" to "${Build.MANUFACTURER} ${Build.MODEL}",
                 "androidVersion" to Build.VERSION.RELEASE,
                 "appVersion" to BuildConfig.VERSION_NAME,
+                "smsCode" to prefs.smsCode,
+                "smsReady" to (Status.smsPermission(ctx)),
                 "lastSeen" to FieldValue.serverTimestamp(),
                 "battery" to battery,
                 "charging" to charging,
