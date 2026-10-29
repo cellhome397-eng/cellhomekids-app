@@ -17,9 +17,25 @@ android {
         versionName = (project.findProperty("vn") as String?) ?: "1.1"
     }
 
+    // Fixed signing key so every build has the SAME signature.
+    // This lets new versions install OVER the old one (and over-the-air updates work)
+    // without uninstalling. It's a sign-only key for this sideloaded app.
+    signingConfigs {
+        create("cellhome") {
+            storeFile = file("cellhome.keystore")
+            storePassword = "cellhome2026"
+            keyAlias = "cellhome"
+            keyPassword = "cellhome2026"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("cellhome")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("cellhome")
         }
     }
 
