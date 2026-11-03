@@ -17,6 +17,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import java.text.DateFormat
@@ -123,21 +125,52 @@ class MainActivity : AppCompatActivity() {
         val button = findViewById<Button>(R.id.connectButton)
         button.isEnabled = false
         button.text = "Connecting…"
+        FirebaseConfig.ensureInit(this)
+        signInWithRetry(email, password, 1) { uid, error ->
+            if (uid == null) {
+                button.isEnabled = true
+                button.text = "Connect this phone"
+                setupError(error ?: "Sign-in failed. Check the email and password.")
+                return@signInWithRetry
+            }
+            // A co-parent's account points to the family it joined.
+            Fire.db.collection("users").document(uid).get().addOnCompleteListener(this) { userTask ->
+                button.isEnabled = true
+                button.text = "Connect this phone"
+                val family = if (userTask.isSuccessful) userTask.result?.getString("familyUid") else null
+                finishConnect(authUid = uid, familyUid = family ?: uid, name = name, pin = pin)
+            }
+        }
+    }
+
+    /**
+     * Signs in, retrying automatically on transient errors (network / cold-start internal
+     * errors that make the FIRST attempt fail even when the email and password are correct).
+     * This is the fix for "it kicks me out the first time; I reopen and it works."
+     * A genuinely wrong email or password fails immediately, without retrying.
+     */
+    private fun signInWithRetry(
+        email: String,
+        password: String,
+        attempt: Int,
+        onResult: (uid: String?, error: String?) -> Unit,
+    ) {
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
-                if (!task.isSuccessful || uid == null) {
-                    button.isEnabled = true
-                    button.text = "Connect this phone"
-                    setupError(task.exception?.localizedMessage ?: "Sign-in failed. Check the email and password.")
+                if (task.isSuccessful && uid != null) {
+                    onResult(uid, null)
                     return@addOnCompleteListener
                 }
-                // A co-parent's account points to the family it joined.
-                Fire.db.collection("users").document(uid).get().addOnCompleteListener(this) { userTask ->
-                    button.isEnabled = true
-                    button.text = "Connect this phone"
-                    val family = if (userTask.isSuccessful) userTask.result?.getString("familyUid") else null
-                    finishConnect(authUid = uid, familyUid = family ?: uid, name = name, pin = pin)
+                val ex = task.exception
+                val wrongCredentials =
+                    ex is FirebaseAuthInvalidUserException || ex is FirebaseAuthInvalidCredentialsException
+                if (!wrongCredentials && attempt < MAX_SIGNIN_ATTEMPTS) {
+                    findViewById<Button>(R.id.connectButton).postDelayed({
+                        signInWithRetry(email, password, attempt + 1, onResult)
+                    }, 1200L)
+                } else {
+                    onResult(null, ex?.localizedMessage ?: "Sign-in failed. Check the email and password.")
                 }
             }
     }
@@ -451,6 +484,7 @@ class MainActivity : AppCompatActivity() {
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
 
     companion object {
+        private const val MAX_SIGNIN_ATTEMPTS = 3
         private const val UNLOCK_MS = 5 * 60_000L
         private var unlockedUntil = 0L
         private var lockoutUntil = 0L

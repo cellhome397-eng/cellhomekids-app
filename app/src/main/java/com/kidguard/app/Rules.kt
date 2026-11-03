@@ -30,12 +30,26 @@ data class Rules(
     val blockedApps: Set<String> = emptySet(),
     val appLimits: Map<String, Int> = emptyMap(),
     val dailyLimitMinutes: Int = 0,
+    /**
+     * Per-weekday screen-time limit in minutes, keyed by Calendar.DAY_OF_WEEK
+     * (1 = Sunday … 7 = Saturday). When the parent sets a value > 0 for today,
+     * it overrides dailyLimitMinutes for that day. Empty = use dailyLimitMinutes.
+     */
+    val weeklyLimits: Map<Int, Int> = emptyMap(),
     val bedtime: Bedtime = Bedtime(),
     val lockSettings: Boolean = true,
     val settingsPinOnPhone: Boolean = true,
     val pausedUntil: Long = 0L,
     val places: List<Place> = emptyList(),
 ) {
+    /** The screen-time cap that applies today: the per-weekday limit if set, else the daily one. 0 = no cap. */
+    fun effectiveDailyLimit(now: Long = System.currentTimeMillis()): Int {
+        val dow = java.util.Calendar.getInstance().apply { timeInMillis = now }
+            .get(java.util.Calendar.DAY_OF_WEEK)
+        val perDay = weeklyLimits[dow] ?: 0
+        return if (perDay > 0) perDay else dailyLimitMinutes
+    }
+
     fun toJson(): String {
         val limits = JSONArray()
         appLimits.forEach { (pkg, min) -> limits.put(JSONObject().put("pkg", pkg).put("minutes", min)) }
@@ -50,6 +64,7 @@ data class Rules(
             .put("blockedApps", JSONArray(blockedApps.toList()))
             .put("appLimits", limits)
             .put("dailyLimitMinutes", dailyLimitMinutes)
+            .put("weeklyLimits", JSONObject().also { w -> weeklyLimits.forEach { (dow, min) -> w.put(dow.toString(), min) } })
             .put(
                 "bedtime",
                 JSONObject().put("enabled", bedtime.enabled).put("start", bedtime.start).put("end", bedtime.end),
@@ -86,6 +101,13 @@ data class Rules(
                 blockedApps = blocked,
                 appLimits = limits,
                 dailyLimitMinutes = (m["dailyLimitMinutes"] as? Number)?.toInt() ?: 0,
+                weeklyLimits = HashMap<Int, Int>().also { out ->
+                    (m["weeklyLimits"] as? Map<*, *>)?.forEach { (k, v) ->
+                        val day = (k as? String)?.toIntOrNull() ?: (k as? Number)?.toInt()
+                        val min = (v as? Number)?.toInt()
+                        if (day != null && min != null && day in 1..7 && min > 0) out[day] = min
+                    }
+                },
                 bedtime = Bedtime(
                     enabled = b?.get("enabled") as? Boolean ?: false,
                     start = b?.get("start") as? String ?: "21:00",
@@ -124,6 +146,17 @@ data class Rules(
                     blockedApps = blocked,
                     appLimits = limits,
                     dailyLimitMinutes = o.optInt("dailyLimitMinutes", 0),
+                    weeklyLimits = HashMap<Int, Int>().also { out ->
+                        o.optJSONObject("weeklyLimits")?.let { w ->
+                            val keys = w.keys()
+                            while (keys.hasNext()) {
+                                val k = keys.next()
+                                val day = k.toIntOrNull()
+                                val min = w.optInt(k, 0)
+                                if (day != null && day in 1..7 && min > 0) out[day] = min
+                            }
+                        }
+                    },
                     bedtime = Bedtime(
                         enabled = b?.optBoolean("enabled", false) ?: false,
                         start = b?.optString("start", "21:00") ?: "21:00",

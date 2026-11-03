@@ -34,9 +34,10 @@ object Enforcer {
         rules.appLimits[pkg]?.let { limit ->
             if ((usageMs[pkg] ?: 0L) >= limit * 60_000L) return BlockReason.APP_LIMIT
         }
-        if (rules.dailyLimitMinutes > 0) {
+        val dailyLimit = rules.effectiveDailyLimit(now)
+        if (dailyLimit > 0) {
             val total = usageMs.filterKeys { it !in allowed && it !in Apps.SETTINGS_PACKAGES }.values.sum()
-            if (total >= rules.dailyLimitMinutes * 60_000L) return BlockReason.DAILY_LIMIT
+            if (total >= dailyLimit * 60_000L) return BlockReason.DAILY_LIMIT
         }
         return null
     }

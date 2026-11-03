@@ -63,9 +63,28 @@ class ReleaseReceiver : BroadcastReceiver() {
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED && Prefs(context).parentUid != null) {
-            SyncWorker.schedule(context)
-            SyncWorker.runNow(context)
+        val action = intent.action
+        val isBoot = action == Intent.ACTION_BOOT_COMPLETED ||
+            action == "android.intent.action.QUICKBOOT_POWERON" ||   // Samsung/HTC fast power-on
+            action == "com.htc.intent.action.QUICKBOOT_POWERON" ||
+            action == Intent.ACTION_MY_PACKAGE_REPLACED               // after an app update
+        if (!isBoot) return
+        val prefs = Prefs(context)
+        if (prefs.parentUid == null) return
+        SyncWorker.schedule(context)
+        SyncWorker.runNow(context)
+        // If the parent is holding the phone locked, bring the lock back the moment the
+        // phone powers on again — so turning it off and on (or a restart) can't escape it.
+        if (prefs.screenLocked()) {
+            LockActivity.show(context)
+            if (Status.adminOn(context)) {
+                try {
+                    (context.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager)
+                        .lockNow()
+                } catch (e: Exception) {
+                    // ignore: the accessibility service re-asserts the lock on the next check
+                }
+            }
         }
     }
 }
